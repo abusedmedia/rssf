@@ -19,7 +19,12 @@ export function SiteFooter() {
           Fabio Franchino
         </ExternalLink>
       </p>
-      <LegalNav />
+      <div className="legal-nav">
+        <ExternalLink href="https://github.com/abusedmedia/rssf">
+          GitHub
+        </ExternalLink>
+        <LegalNav />
+      </div>
     </footer>
   );
 }

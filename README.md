@@ -2,6 +2,8 @@
 
 Open-source form builder on Cloudflare. Describe what you want to collect; Workers AI turns that into structured form JSON. Owners sign in with Google. Anyone with a published link can submit. Answers live in D1 (SQLite).
 
+Public site: [http://reallysupersimpleform.com/](http://reallysupersimpleform.com/)
+
 ## Stack
 
 | Piece | Cloudflare product |
