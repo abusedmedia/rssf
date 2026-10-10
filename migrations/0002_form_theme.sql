@@ -1,0 +1,1 @@
+ALTER TABLE forms ADD COLUMN theme TEXT NOT NULL DEFAULT 'paper';
