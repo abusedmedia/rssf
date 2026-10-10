@@ -13,37 +13,40 @@ export function Shell({
 }) {
   const { user, logout } = useAuth();
   const { appearance, toggle } = useAppearance();
+  const signedIn = !bare && Boolean(user);
 
   return (
     <div className="shell">
-      <header className="topbar">
+      <header className={signedIn ? "topbar topbar-auth" : "topbar"}>
         <Link to={user ? "/app" : "/"} className="brand">
           <span className="brand-mark">RF</span>
           <span>RSSF</span>
         </Link>
-        <div className="row">
-          <button
-            className="btn secondary"
-            type="button"
-            onClick={toggle}
-            aria-label={appearance === "dark" ? "Use light theme" : "Use dark theme"}
-          >
-            {appearance === "dark" ? "Light" : "Dark"}
-          </button>
-          {!bare && user ? (
-            <>
-              <div className="user-chip">
-                {user.picture ? (
-                  <img src={user.picture} alt="" referrerPolicy="no-referrer" />
-                ) : null}
-                <span className="muted">{user.name || user.email}</span>
-              </div>
-              <button className="btn secondary" type="button" onClick={() => logout()}>
-                Sign out
-              </button>
-            </>
-          ) : null}
-        </div>
+        <button
+          className="btn secondary topbar-theme"
+          type="button"
+          onClick={toggle}
+          aria-label={appearance === "dark" ? "Use light theme" : "Use dark theme"}
+        >
+          {appearance === "dark" ? "Light" : "Dark"}
+        </button>
+        {signedIn && user ? (
+          <>
+            <div className="user-chip">
+              {user.picture ? (
+                <img src={user.picture} alt="" referrerPolicy="no-referrer" />
+              ) : null}
+              <span className="muted">{user.name || user.email}</span>
+            </div>
+            <button
+              className="btn secondary topbar-signout"
+              type="button"
+              onClick={() => logout()}
+            >
+              Sign out
+            </button>
+          </>
+        ) : null}
       </header>
       <main className="shell-main">{children}</main>
       <SiteFooter />
