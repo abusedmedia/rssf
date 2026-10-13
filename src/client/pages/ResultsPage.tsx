@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useParams } from "react-router-dom";
 import {
   deleteSubmission,
@@ -16,6 +17,7 @@ export function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([getForm(id), listSubmissions(id)])
@@ -39,6 +41,7 @@ export function ResultsPage() {
     try {
       await deleteSubmission(form.id, submissionId);
       setSubmissions((prev) => prev.filter((s) => s.id !== submissionId));
+      setSelectedId((current) => (current === submissionId ? null : current));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete response");
     } finally {
@@ -63,6 +66,11 @@ export function ResultsPage() {
   }
 
   const keys = form.schema.fields.map((f) => f.key);
+  const selected = submissions.find((s) => s.id === selectedId) ?? null;
+
+  function toggleSelected(submissionId: string) {
+    setSelectedId((current) => (current === submissionId ? null : submissionId));
+  }
 
   return (
     <Shell>
@@ -94,7 +102,7 @@ export function ResultsPage() {
           <div className="empty">No submissions yet. Test the form or share the public link.</div>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="results-table">
               <thead>
                 <tr>
                   <th>When</th>
@@ -107,7 +115,22 @@ export function ResultsPage() {
               </thead>
               <tbody>
                 {submissions.map((s) => (
-                  <tr key={s.id}>
+                  <tr
+                    key={s.id}
+                    className={selectedId === s.id ? "is-selected" : undefined}
+                    tabIndex={0}
+                    aria-selected={selectedId === s.id}
+                    onClick={(event) => {
+                      if (isRowAction(event.target)) return;
+                      toggleSelected(s.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      if (isRowAction(event.target)) return;
+                      event.preventDefault();
+                      toggleSelected(s.id);
+                    }}
+                  >
                     <td className="mono">{new Date(s.createdAt).toLocaleString()}</td>
                     <td>
                       {s.isTest ? (
@@ -124,7 +147,10 @@ export function ResultsPage() {
                         className="btn danger"
                         type="button"
                         disabled={deletingId === s.id}
-                        onClick={() => void onDelete(s.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void onDelete(s.id);
+                        }}
                       >
                         {deletingId === s.id ? "Deleting…" : "Delete"}
                       </button>
@@ -136,8 +162,103 @@ export function ResultsPage() {
           </div>
         )}
       </div>
+      {selected ? (
+        <RecordPreview
+          form={form}
+          submission={selected}
+          onClose={() => setSelectedId(null)}
+        />
+      ) : null}
     </Shell>
   );
+}
+
+function RecordPreview({
+  form,
+  submission,
+  onClose,
+}: {
+  form: FormDetail;
+  submission: Submission;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const drawerRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  const items = previewItems(form, submission);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const previous = document.activeElement;
+    drawerRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onCloseRef.current();
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+      if (previous instanceof HTMLElement) previous.focus();
+    };
+  }, [submission.id]);
+
+  return createPortal(
+    <div className="record-layer">
+      <div className="record-backdrop" onClick={onClose} />
+      <aside
+        ref={drawerRef}
+        className="record-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
+        <div className="record-drawer-head">
+          <h2 id={titleId}>Response</h2>
+          <button className="btn secondary" type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <dl className="record-preview">
+          {items.map((item) => (
+            <div key={item.id}>
+              <dt>{item.label}</dt>
+              <dd className={item.value ? undefined : "muted"}>{item.value || "—"}</dd>
+            </div>
+          ))}
+        </dl>
+      </aside>
+    </div>,
+    document.body,
+  );
+}
+
+function previewItems(form: FormDetail, submission: Submission) {
+  return [
+    {
+      id: "when",
+      label: "When",
+      value: new Date(submission.createdAt).toLocaleString(),
+    },
+    {
+      id: "type",
+      label: "Type",
+      value: submission.isTest ? "test" : "live",
+    },
+    ...form.schema.fields.map((field) => ({
+      id: field.key,
+      label: field.label,
+      value: formatValue(submission.payload[field.key]),
+    })),
+  ];
+}
+
+function isRowAction(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest("button, a"));
 }
 
 function formatValue(value: unknown): string {
